@@ -13,25 +13,30 @@ app.config['UPLOAD_FOLDER'] = 'uploads/'
 
 class Detection:
     def __init__(self):
-        #download weights from here:https://github.com/ultralytics/ultralytics and change the path
-        self.model = YOLO(r"object_detection\yolov8n.pt")
+        # Download weights from: https://github.com/ultralytics/ultralytics and adjust path as needed
+        self.model = YOLO(r"C:\Users\hp\Downloads\yolo11n.pt")  # Likely yolov8n.pt
 
     def predict(self, img, classes=[], conf=0.5):
         if classes:
             results = self.model.predict(img, classes=classes, conf=conf)
         else:
             results = self.model.predict(img, conf=conf)
-
         return results
 
     def predict_and_detect(self, img, classes=[], conf=0.5, rectangle_thickness=2, text_thickness=1):
         results = self.predict(img, classes, conf=conf)
         for result in results:
             for box in result.boxes:
-                cv2.rectangle(img, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),
-                              (int(box.xyxy[0][2]), int(box.xyxy[0][3])), (255, 0, 0), rectangle_thickness)
-                cv2.putText(img, f"{result.names[int(box.cls[0])]}",
-                            (int(box.xyxy[0][0]), int(box.xyxy[0][1]) - 10),
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                cls = int(box.cls[0])
+                conf_score = float(box.conf[0])
+
+                # Draw bounding box
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), rectangle_thickness)
+
+                # Draw label with confidence
+                label = f"{result.names[cls]} {conf_score:.2f}"
+                cv2.putText(img, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), text_thickness)
         return img, results
 
@@ -86,7 +91,7 @@ def gen_frames():
     while cap.isOpened():
         ret, frame = cap.read()
         frame = cv2.resize(frame, (512, 512))
-        if frame is None:
+        if not ret or frame is None:
             break
         frame = detection.detect_from_image(frame)
 
@@ -101,7 +106,13 @@ def gen_frames():
 def video_feed():
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
 if __name__ == '__main__':
+    # Make sure the uploads folder exists
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+
     app.run(host="0.0.0.0", port=8000)
-    #http://localhost:8000/video for video source
-    #http://localhost:8000 for image source
+    # Access via:
+    # http://localhost:8000 for image detection
+    # http://localhost:8000/video for webcam detection
